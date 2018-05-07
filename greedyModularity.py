@@ -5,14 +5,15 @@ Created on Tue Apr 10 15:09:28 2018
 @author: KeczerZs
 
 This school project is an implemenation of Newman's (2004a) greedy modularity
-maximatization algorithm and its improvement by Clauset, Newman and Moore (2004b). 
+maximatization algorithm and its improved version by Clauset, Newman and Moore (2004b). 
 
 References:
 Newman, M. E. (2004a). Fast algorithm for detecting community structure in networks. Physical review E, 69(6), 066133.
 Clauset, A., Newman, M. E., & Moore, C. (2004b). Finding community structure in very large networks. Physical review E, 70(6), 066111.
 
 The code of greedyQ function is also based on networkx library codes by Edward L. Platt
-Reference: https://networkx.github.io/documentation/latest/_modules/networkx/algorithms/community/modularity_max.html 
+Reference: 
+https://networkx.github.io/documentation/latest/_modules/networkx/algorithms/community/modularity_max.html 
 
 """
 
@@ -26,6 +27,9 @@ def createTestGraph1():
     
     The test graph G has two fully-connected clusters and there is
     a single-node bridge between the clusters.
+    
+    This function uses networx library.
+    > import networkx
     
     Example:
     > G = createTestGraph1()
@@ -67,12 +71,18 @@ def greedyQ(graph):
      Example for node labels in the input (undirected, unweighted graph with 7 nodes):
      > graph.nodes()
      > NodeView((0, 1, 2, 3, 4, 5, 6))
+     
+    This function uses networx library.
+    > import networkx
+    > from networkx.algorithms import community
+    
+    graph : networkx graph object (undirected and unweighted, node labes from 0 to N-1)
         
     TODO
     -Solve arbitrary node labels
     -Solve weighted graph
     -Solve best output format
-    -Solve implemention with a heap
+    -Solve implemention with a heap       
         
     #Returns communityMerges : list of about all merges
     Returns communities : list of forzen sets, communities at the maximum Q value
