@@ -35,7 +35,9 @@ import numpy as np
 
 def greedyQ(graph, weighted = False):
     '''
-    Current version (simplified version of codes by Edward L. Platt):
+    Original codes are the work of Edward L. Platt
+    
+    Current version:
     -For undirected and unweighted/weighted networks    
     -For node labels that are consecutive integers from 0 to N-1 in the input graph
      where N is the number of nodes
@@ -473,7 +475,6 @@ def weightedTest():
 # Testing with a weighted graph
 #plt.figure()
 #weightedTest()
-
 
 
 
