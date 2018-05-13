@@ -33,10 +33,10 @@ import matplotlib.pyplot as plt
 import numpy as np
 
 
-def greedyQ(graph):
+def greedyQ(graph, weighted = False):
     '''
     Current version (simplified version of codes by Edward L. Platt):
-    -Only for undirected and unweighted networks    
+    -For undirected and unweighted/weighted networks    
     -For node labels that are consecutive integers from 0 to N-1 in the input graph
      where N is the number of nodes
      Example for node labels in the input (undirected, unweighted graph with 7 nodes):
@@ -51,22 +51,27 @@ def greedyQ(graph):
         
     TODO
     -Solve arbitrary node labels
-    -Solve weighted graph
-    -Solve best output format
-    -Solve implemention with a heap       
+    -Solve implemention with a heap
+    -Test with weighted graphs       
         
-    #Returns communityMerges : list of about all merges
     Returns communities : list of forzen sets, communities at the maximum Q value
-    
     '''
     
     # Constants (capitalized): graph data
-    # N: number of nodes
+    # number of nodes
     N = len(graph.nodes()) 
-    # M: number of edges
+    # number of edges
     M = len(graph.edges()) 
-    # DEGREES: list of ints, degrees of nodes in order
-    DEGREES = [graph.degree()[i] for i in range(N)] 
+    # list of ints, degrees of nodes in order
+    DEGREES = [graph.degree()[i] for i in range(N)]
+    if weighted:
+        # dict of floats, node strengths in order
+        STRENGTHS = {node : 0 for node in graph.nodes()}
+        for source,target,attrs in graph.edges(data=True):
+            STRENGTHS[source] += attrs['weight']
+            STRENGTHS[target] += attrs['weight']
+        # float, number of edges (weighted)   
+        W = sum(STRENGTHS.values())/2.0        
     
     # Initialize community and merge lists
     # commintiy merging (alway i into j) happens with set joining operation
@@ -83,37 +88,49 @@ def greedyQ(graph):
     # Initial data for while loop   
     # half of the fraction of edges btw communities i and j (each community has one node at first)
     # (variable name Eij is from the Clauset, Newman and Moore article)
-    Eij = 1.0 / (2.0*M) 
-    # fraction of half-edges in each community
-    # (variable name a is from the Clauset, Newman and Moore article)
-    a = [DEGREES[i] / (2.0*M) for i in range(N)]   
-    # nested dictionary represenation of matrix cells where there are edges in the orginial adjecency matrix
-    # outer key i represents row index, inner key j represents coloumn index
-    deltaQ = {i: 
-                {j: 2*Eij - 2*DEGREES[i]*DEGREES[j]*Eij**2 
+    if weighted:
+        Eij = {i: 
+                {j: graph.get_edge_data(i,j)['weight']/(2.0*W) 
                  for j in graph.neighbors(i) if j!= i
                 } 
               for i in range(N)
-             }    
-       
+             }
+        # fraction of half-edges in each community
+        # (variable name a is from the Clauset, Newman and Moore article)
+        a = [STRENGTHS[i] / (2.0*W) for i in range(N)]
+        # nested dictionary represenation of matrix cells where there are edges in the orginial adjecency matrix
+        # outer key i represents the row index, inner key j represents the coloumn index
+        deltaQ = {i: 
+                    {j: 2*Eij[i][j] - 2*STRENGTHS[i]*STRENGTHS[j]*(1/(2*W))**2 
+                     for j in graph.neighbors(i) if j!= i
+                    } 
+                  for i in range(N)
+                 }
+    else:
+        Eij = 1.0 / (2.0*M) 
+        # fraction of half-edges in each community
+        # (variable name a is from the Clauset, Newman and Moore article)
+        a = [DEGREES[i] / (2.0*M) for i in range(N)]   
+        # nested dictionary represenation of matrix cells where there are edges in the orginial adjecency matrix
+        # outer key i represents row index, inner key j represents coloumn index
+        deltaQ = {i: 
+                    {j: 2*Eij - 2*DEGREES[i]*DEGREES[j]*Eij**2 
+                     for j in graph.neighbors(i) if j!= i
+                    } 
+                  for i in range(N)
+                 }           
     
     # we remove keys (representig matrix rows) from deltaQ in each iteraton, 
     # we can iterate until all nodes are in one community (one key remains in deltaQ)
     # alternatively: we can iterate till the Q value increases, then break from the loop
-    while len(deltaQ) > 1: 
-        
+    while len(deltaQ) > 1:         
               
         # Select maximum deltaQ value and its coordinates (i and j)
         # For this, a heap was used in the orginial article, which yields better speed performance
         # i : j of max deltaQ (row coordinate to row maximum coordinate)
-        try:
-            iTojOfMaxDeltaQ_dict = {i : max(deltaQ[i].keys(), key=(lambda j: deltaQ[i][j])) for i in deltaQ}
-        except ValueError:
-            break 
-        #iTojOfMaxDeltaQ_dict = {i : max(deltaQ[i].keys(), key=(lambda j: deltaQ[i][j])) for i in deltaQ if len(deltaQ[i]) > 0} 
+        iTojOfMaxDeltaQ_dict = {i : max(deltaQ[i].keys(), key=(lambda j: deltaQ[i][j])) for i in deltaQ}
          # i : row max deltaQ value (row coordinate to row maximum value)
         iToMaxDeltaQ_dict = {i : deltaQ[i][iTojOfMaxDeltaQ_dict[i]] for i in deltaQ}   
-        #iToMaxDeltaQ_dict = {i : deltaQ[i][iTojOfMaxDeltaQ_dict[i]] for i in deltaQ if i in iTojOfMaxDeltaQ_dict}  
         # i coordinate (row coodinate with the highest of the row maximum deltaQ values)
         maxDeltaQ_i = max(iToMaxDeltaQ_dict.keys(), key=(lambda i: iToMaxDeltaQ_dict[i])) 
         # j coordinate (the row maximum coordinate in the row i)
@@ -133,7 +150,6 @@ def greedyQ(graph):
         communities[j] = frozenset(communities[i] | communities[j])
         del communities[i]
         communityMerges.append((i, j, maxDeltaQ_value, Q))        
-        
         
         # Find values to update in detlaQ (for communities connected to communities i and j)
         neighbors_i = set(deltaQ[i].keys())
@@ -180,53 +196,55 @@ def greedyQ(graph):
                
     #end of while 
     
-    # Returning data about community merges (e.g., for createing dendogram)
-    #return communityMerges
-    
     # Returning partion at maximum Q value
     communities = [frozenset(c) for c in communities.values()]
     return sorted(communities, key=len, reverse=True)
 
 
-def createTestGraph1():
+def classicGNTest(Zout):
     '''
-    Creates a simple, undirected and unweighted test graph with 7 nodes.
+    This function generates a Girvan-Newman test network with four modules 
+    the network has 128 nodes (each module has 32 nodes)
     
-    The test graph G has two fully-connected clusters and there is
-    a single-node bridge between the clusters.
+    Zout : non-negative float
     
-    This function uses networx library.
-    > import networkx
-    
-    Example:
-    > G = createTestGraph1()
-    > nx.draw(G)
-    > G.nodes()
-    > NodeView((0, 1, 2, 3, 4, 5, 6))
-    > print(community.modularity(G, [[0, 1, 2], [3, 4, 5, 6]]))
-    > 0.35499999999999987
-    
-    returns G : networkx graph object
-    '''
-    G = nx.Graph()
+    It creates plots before and after the community detection.
+    Each community has a different random color after the community detection.
 
-    #cluster 1 : 0,1,2
-    G.add_edge(0,1)
-    G.add_edge(0,2)
-    G.add_edge(1,2)
+    Returns fractionOfCorrectlyClustered : float    
+    '''    
+    # Create a Girvan-Newman test graph
+    G = girvan_graphs(Zout)
     
-    #bridge
-    G.add_edge(2,3)
+    # Draw the generated network before detecting communities
+    nx.draw(G, with_labels = True)
     
-    #cluster 2 : 3,4,5,6
-    G.add_edge(3,4)
-    G.add_edge(3,5)
-    G.add_edge(3,6)
-    G.add_edge(4,5)
-    G.add_edge(4,6)
-    G.add_edge(5,6)
+    # Run the community detection
+    communities = greedyQ(G)
+    #sorted(communities, key = (lambda community: list(community)[0]))
+    communities.sort(key = (lambda community: sorted(list(community))[0]))
+    #print(communities)
     
-    return G
+    # Assign a community number to each node
+    nodeToCommunity_dict = {node : c for c in range(len(communities)) for node in communities[c]}
+    #print(nodeToCommunity_dict)
+        
+    # Assign a random color to each community (RGB code in a tuple)
+    communityToColor_dict = {c : (random(), random(), random()) for c in range(len(communities))}
+    
+    # Assign each a color to each node
+    nodeColors = [communityToColor_dict[nodeToCommunity_dict[node]] for node in G.nodes()]
+    
+    # Fraction of correctly clustered nodes
+    correctlyClustered = [node for node in nodeToCommunity_dict if node % 4 == nodeToCommunity_dict[node] % 4]
+    fractionOfCorrectlyClustered = len(correctlyClustered)/len(G.nodes())
+    
+    # Draw network, each community has a different random color
+    plt.figure()
+    nx.draw(G, node_color = nodeColors, with_labels = True)    
+            
+    return fractionOfCorrectlyClustered
+
 
 def classicGNTest_repeated():
     '''
@@ -270,49 +288,45 @@ def classicGNTest_repeated():
     return
 
 
-def classicGNTest(Zout):
+def createTestGraph1():
     '''
-    This function generates a Girvan-Newman test network with four modules 
-    the network has 128 nodes (each module has 32 nodes)
+    Creates a simple, undirected and unweighted test graph with 7 nodes.
     
-    Zout : non-negative float
+    The test graph G has two fully-connected clusters and there is
+    a single-node bridge between the clusters.
     
-    It creates plots before and after the community detection.
-    Each community has a different random color after the community detection.    
-    '''    
-    # Create a Girvan-Newman test graph
-    G = girvan_graphs(Zout)
+    This function uses networx library.
+    > import networkx
     
-    # Draw the generated network before detecting communities
-    nx.draw(G, with_labels = True)
+    Example:
+    > G = createTestGraph1()
+    > nx.draw(G)
+    > G.nodes()
+    > NodeView((0, 1, 2, 3, 4, 5, 6))
+    > print(community.modularity(G, [[0, 1, 2], [3, 4, 5, 6]]))
+    > 0.35499999999999987
     
-    # Run the community detection
-    communities = greedyQ(G)
-    #sorted(communities, key = (lambda community: list(community)[0]))
-    communities.sort(key = (lambda community: sorted(list(community))[0]))
-    #print(communities)
+    returns G : networkx graph object
+    '''
+    G = nx.Graph()
+
+    #cluster 1 : 0,1,2
+    G.add_edge(0,1)
+    G.add_edge(0,2)
+    G.add_edge(1,2)
     
-    # Assign a community number to each node
-    nodeToCommunity_dict = {node : c for c in range(len(communities)) for node in communities[c]}
-    #print(nodeToCommunity_dict)
-        
-    # Assign a random color to each community (RGB code in a tuple)
-    communityToColor_dict = {c : (random(), random(), random()) for c in range(len(communities))}
+    #bridge
+    G.add_edge(2,3)
     
-    # Assign each a color to each node
-    nodeColors = [communityToColor_dict[nodeToCommunity_dict[node]] for node in G.nodes()]
+    #cluster 2 : 3,4,5,6
+    G.add_edge(3,4)
+    G.add_edge(3,5)
+    G.add_edge(3,6)
+    G.add_edge(4,5)
+    G.add_edge(4,6)
+    G.add_edge(5,6)
     
-    # Fraction of correctly clustered nodes
-    correctlyClustered = [node for node in nodeToCommunity_dict if node % 4 == nodeToCommunity_dict[node] % 4]
-    #print(correctlyClustered)
-    fractionOfCorrectlyClustered = len(correctlyClustered)/len(G.nodes())
-    print(fractionOfCorrectlyClustered)
-    
-    # Draw network, each community has a different random color
-    plt.figure()
-    nx.draw(G, node_color = nodeColors, with_labels = True)    
-            
-    return fractionOfCorrectlyClustered
+    return G
 
 
 def createTestGraph2():
@@ -351,11 +365,80 @@ def createTestGraph2():
     
     return G
 
+
+def createTestGraph3():
+    '''
+    Creates a simple, undirected and weighted test graph with two components.
+    In one of the components, there are two communities connected 
+    by a birdge with a large weight.
+    
+    This function uses networx library.
+    > import networkx
+    
+    Example:
+    > G = createTestGraph2()
+    
+    returns G : networkx graph object
+    '''
+    G = nx.Graph()
+
+    #cluster 1 : 0,1,2
+    G.add_edge(0,1, weight=1)
+    G.add_edge(0,2, weight=1)
+    G.add_edge(1,2, weight=1)
+    
+    #bridge : it has a relatively big weight!
+    G.add_edge(2,3, weight=10)
+    
+    #cluster 2 : 3,4,5,6
+    G.add_edge(3,4, weight=1)
+    G.add_edge(3,5, weight=1)
+    G.add_edge(3,6, weight=1)
+    G.add_edge(4,5, weight=1)
+    G.add_edge(4,6, weight=1)
+    G.add_edge(5,6, weight=1)
+    
+    G.add_edge(7,8, weight=1)
+    G.add_edge(7,9, weight=1)
+    G.add_edge(8,9, weight=1)  
+    
+    return G
+
 def compontentTest():
+    '''
+    Runs a simple test with an undirected and unweighted networks that has multiple components.
+    '''
     
     G = createTestGraph2()
+    
     nx.draw(G, with_labels = True)
+    
     communities = greedyQ(G)
+    # Assign a community number to each node
+    nodeToCommunity_dict = {node : c for c in range(len(communities)) for node in communities[c]}
+        
+    # Assign a random color to each community (RGB code in a tuple)
+    communityToColor_dict = {c : (random(), random(), random()) for c in range(len(communities))}
+    
+    # Assign each a color to each node
+    nodeColors = [communityToColor_dict[nodeToCommunity_dict[node]] for node in G.nodes()]
+    
+    # Draw network, each community has a different random color
+    plt.figure()
+    nx.draw(G, node_color = nodeColors, with_labels = True)    
+    
+    return
+
+def weightedTest():
+    '''
+    Runs a simple test with an undirected and weighted networks that has multiple components.
+    '''
+    
+    G = createTestGraph3()
+    
+    nx.draw(G, with_labels = True)
+    
+    communities = greedyQ(G, weighted=True)
     # Assign a community number to each node
     nodeToCommunity_dict = {node : c for c in range(len(communities)) for node in communities[c]}
         
@@ -386,6 +469,11 @@ def compontentTest():
 # Testing with a graph consisting of multiple components
 #plt.figure()
 #compontentTest()    
+    
+# Testing with a weighted graph
+#plt.figure()
+#weightedTest()
+
 
 
 

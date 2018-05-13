@@ -15,7 +15,7 @@ References:
 https://networkx.github.io/documentation/latest/_modules/networkx/algorithms/community/modularity_max.html
 https://github.com/networkx/networkx/blob/master/networkx/algorithms/community/modularity_max.py
 
-The test_community.py is the work of Thomas Aynaud et al. (2009)
+The test_community.py is the work of Thomas Aynaud et al. (2009).
 In this project, the implementaiton of the Girvan-Newman test graph generator is used from test_community.py
 
 References:
